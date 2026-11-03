@@ -1,4 +1,25 @@
+# Ambientes virtuais
 .venv/
+venv/
+env/
+
+# Caches do Python e Pytest
 __pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Mídias e artefatos binários gerados localmente
 *.mp4
+gravacao_p6.mp4
+
+# Bancos de dados de teste / runtime
 *.db
+*.sqlite
+*.sqlite3
+p6_metadata.db
+
+# Configurações de IDE / OS
+.vscode/
+.idea/
+.DS_Store

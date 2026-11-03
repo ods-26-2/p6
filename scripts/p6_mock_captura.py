@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 
 # 1. Preparar o Banco de Dados (SQLite)
-conn = sqlite3.connect('p6_metadata.db')
+conn = sqlite3.connect('../p6_metadata.db')
 cursor = conn.cursor()
 
 cursor.execute('''
@@ -32,7 +32,7 @@ with yt_dlp.YoutubeDL(ydl_opts) as ydl:
 
 cap = cv2.VideoCapture(stream_url)
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-out = cv2.VideoWriter('gravacao_p6.mp4', fourcc, 30.0, (640, 480))
+out = cv2.VideoWriter('../gravacao_p6.mp4', fourcc, 30.0, (640, 480))
 
 # 3. Variáveis de estado da sessão
 session_id = str(uuid.uuid4())

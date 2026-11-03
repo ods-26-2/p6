@@ -1,6 +1,6 @@
 import sqlite3
 
-conn = sqlite3.connect('p6_metadata.db')
+conn = sqlite3.connect('../p6_metadata.db')
 cursor = conn.cursor()
 
 # Consulta os 5 primeiros e os 5 últimos quadros gravados
