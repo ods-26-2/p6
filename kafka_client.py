@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from confluent_kafka import Producer, Consumer
 
-KAFKA_BROKER = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "34.66.235.91:9093")
+KAFKA_BROKER = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "172.18.4.56:9092")
 
 def criar_produtor():
     return Producer({"bootstrap.servers": KAFKA_BROKER})

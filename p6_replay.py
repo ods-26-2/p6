@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from confluent_kafka import Producer
 
 # Configuração do broker Kafka (TRA-1 Google Cloud por defeito)
-KAFKA_BROKER = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "34.66.235.91:9093")
+KAFKA_BROKER = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "172.18.4.56:9092")
 producer = Producer({"bootstrap.servers": KAFKA_BROKER})
 
 def entrega_callback(err, msg):
