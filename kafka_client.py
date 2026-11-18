@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 from confluent_kafka import Producer, Consumer
 
-DEFAULT_BROKERS = "172.18.4.56:9092,200.17.66.56:9092,34.66.235.91:9093"
+DEFAULT_BROKERS = "34.66.235.91:9093,172.18.4.56:9092,200.17.66.56:9092"
 KAFKA_BROKER = os.getenv("KAFKA_BOOTSTRAP_SERVERS", DEFAULT_BROKERS)
 
 def criar_produtor():

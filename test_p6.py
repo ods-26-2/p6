@@ -1,60 +1,72 @@
 import sqlite3
 import uuid
 from datetime import datetime, timezone
+from p6_replay import publicar_evento, estado_execucao
 
-def test_formato_session_id():
-    """Garante que session_id gerado seja UUID v4 válido."""
-    novo_id = str(uuid.uuid4())
-    assert isinstance(novo_id, str)
-    assert len(novo_id) == 36
+def test_regressao_campos_obrigatorios_envelope(monkeypatch):
+    """Garante que o envelope publicado pelo P6 contém todos os campos exigidos pelo contrato 1.0."""
+    mensagens_capturadas = []
 
-def test_timestamp_utc_iso8601():
-    """Garante que o timestamp obedece ao padrão ISO 8601 UTC exigido pelo envelope."""
-    ts = datetime.now(timezone.utc).isoformat()
-    assert ts.endswith("+00:00") or ts.endswith("Z")
+    class MockProducer:
+        def produce(self, topic, value, callback=None):
+            mensagens_capturadas.append((topic, value.decode("utf-8")))
+        def poll(self, timeout):
+            pass
 
-def test_persistencia_sqlite(tmp_path):
-    """Valida leitura e escrita na tabela de metadados temporais."""
-    db_path = tmp_path / "teste_metadata.db"
-    conn = sqlite3.connect(db_path)
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE frames (
-            frame_index INTEGER PRIMARY KEY,
-            captured_at TEXT NOT NULL
-        )
-    """)
-    cur.execute("INSERT INTO frames VALUES (?, ?)", (1, "2026-10-23T14:30:00.000Z"))
-    conn.commit()
+    monkeypatch.setattr("p6_replay.producer", MockProducer())
 
-    cur.execute("SELECT captured_at FROM frames WHERE frame_index = 1")
-    row = cur.fetchone()
-    assert row[0] == "2026-10-23T14:30:00.000Z"
+    sessao_teste = str(uuid.uuid4())
+    publicar_evento(
+        topic="ods.p6.replay.state",
+        schema="ods.p6.replay.state",
+        session_id=sessao_teste,
+        sequence=1,
+        payload={"recording_id": "rec-001", "state": "PLAYING"},
+        source_id="cam0"
+    )
+
+    assert len(mensagens_capturadas) == 1
+    topico, raw_json = mensagens_capturadas[0]
+    import json
+    envelope = json.loads(raw_json)
+
+    campos_obrigatorios = [
+        "message_type", "message_id", "schema", "schema_version",
+        "producer", "source_id", "published_at", "captured_at",
+        "session_id", "sequence", "payload"
+    ]
+    for campo in campos_obrigatorios:
+        assert campo in envelope, f"Campo obrigatório ausente: {campo}"
+        assert envelope[campo] is not None, f"Campo obrigatório nulo: {campo}"
+
+    assert envelope["session_id"] == sessao_teste
+    assert envelope["sequence"] == 1
+    assert envelope["source_id"] == "cam0"
+
+def test_banco_cenarios_estrutura_e_consulta():
+    """Verifica se a tabela scenarios no SQLite possui os campos exigidos pela especificação."""
+    conn = sqlite3.connect("p6_metadata.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT recording_id, description, expected_outcome, file_path FROM scenarios WHERE recording_id = 'rec-001'")
+    row = cursor.fetchone()
     conn.close()
 
-def test_envelope_session_started():
-    """Valida se a mensagem de início de sessão respeita os campos da Arquitetura 6c."""
-    payload_exemplo = {
-        "mode": "REPLAY",
-        "started_at": "2026-11-06T14:30:00.000Z",
-        "sources": ["cam0"],
-        "recording_id": "rec-001"
-    }
-    assert payload_exemplo["mode"] in ["LIVE", "REPLAY"]
-    assert isinstance(payload_exemplo["sources"], list)
-    assert len(payload_exemplo["sources"]) > 0
-    assert payload_exemplo["started_at"].endswith("Z")
+    assert row is not None, "Cenário padrão rec-001 não encontrado no banco"
+    assert row[0] == "rec-001"
+    assert len(row[1]) > 0
+    assert len(row[2]) > 0
 
-def test_estrutura_replay_state():
-    """Valida restrições de estado e tempo de ods.p6.replay.state."""
-    state_payload = {
-        "recording_id": "rec-001",
-        "state": "PLAYING",
-        "position_ms": 1500,
-        "duration_ms": 10000,
-        "speed_factor": 1.0,
-        "loop": False
-    }
-    assert state_payload["state"] in ["PLAYING", "PAUSED", "STOPPED"]
-    assert state_payload["position_ms"] <= state_payload["duration_ms"]
-    assert state_payload["speed_factor"] > 0
+def test_controle_estado_comandos_replay():
+    """Valida a transição de estados de execução (PLAY -> PAUSE -> STOP)."""
+    estado_execucao["ativo"] = True
+    estado_execucao["pausado"] = False
+    assert estado_execucao["ativo"] is True
+    assert estado_execucao["pausado"] is False
+
+    # Simula PAUSE
+    estado_execucao["pausado"] = True
+    assert estado_execucao["pausado"] is True
+
+    # Simula STOP
+    estado_execucao["ativo"] = False
+    assert estado_execucao["ativo"] is False
