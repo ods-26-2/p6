@@ -5,17 +5,29 @@ import uuid
 from datetime import datetime, timezone
 from confluent_kafka import Producer, Consumer
 
-DEFAULT_BROKERS = "34.66.235.91:9093,172.18.4.56:9092,200.17.66.56:9092"
-KAFKA_BROKER = os.getenv("KAFKA_BOOTSTRAP_SERVERS", DEFAULT_BROKERS)
+# Broker oficial da disciplina no Google Cloud 
+DEFAULT_BROKER = "34.66.235.91:9093"
+
+def obter_broker():
+    broker = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "").strip()
+    return broker if broker else DEFAULT_BROKER
 
 def criar_produtor():
-    return Producer({"bootstrap.servers": KAFKA_BROKER})
+    return Producer({
+        "bootstrap.servers": obter_broker(),
+        "socket.timeout.ms": 10000,
+        "message.timeout.ms": 15000,
+        "reconnect.backoff.ms": 500,
+        "reconnect.backoff.max.ms": 5000
+    })
 
-def criar_consumidor(grupo="p6-replay-group"):
+def criar_consumidor(group_id):
     return Consumer({
-        "bootstrap.servers": KAFKA_BROKER,
-        "group.id": grupo,
-        "auto.offset.reset": "latest"
+        "bootstrap.servers": obter_broker(),
+        "group.id": group_id,
+        "auto.offset.reset": "latest",
+        "session.timeout.ms": 15000,
+        "heartbeat.interval.ms": 3000
     })
 
 def enviar_evento_ods(produtor, topico, schema, session_id, payload):

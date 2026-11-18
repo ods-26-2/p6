@@ -7,10 +7,11 @@ import time
 from datetime import datetime, timezone
 from confluent_kafka import Producer
 from ods_validator import Validator
+from kafka_client import criar_produtor
 
 DEFAULT_BROKERS = "34.66.235.91:9093,172.18.4.56:9092,200.17.66.56:9092"
 KAFKA_BROKER = os.getenv("KAFKA_BOOTSTRAP_SERVERS", DEFAULT_BROKERS)
-producer = Producer({"bootstrap.servers": KAFKA_BROKER})
+producer = criar_produtor()
 val = Validator()
 
 estado_execucao = {"ativo": False, "pausado": False}
@@ -26,6 +27,7 @@ def publicar_evento(topic, schema, session_id, sequence, payload, captured_at=No
     if schema == "ods.session.started":
         envelope = {
             "schema": schema,
+            "message_id": str(uuid.uuid4()),
             "message_type": "event",
             "producer": "P6",
             "payload": payload

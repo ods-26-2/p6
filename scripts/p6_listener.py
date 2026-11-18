@@ -54,6 +54,7 @@ def montar_resposta_recordings(correlation_id):
     ]
     resposta = {
         "schema": "ods.p6.recordings.reply",
+        "message_id": str(uuid.uuid4()),
         "message_type": "reply",
         "producer": "P6",
         "correlation_id": correlation_id,
