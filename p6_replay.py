@@ -6,12 +6,13 @@ import json
 import time
 from datetime import datetime, timezone
 from confluent_kafka import Producer
+from ods_validator import Validator
 
 DEFAULT_BROKERS = "34.66.235.91:9093,172.18.4.56:9092,200.17.66.56:9092"
 KAFKA_BROKER = os.getenv("KAFKA_BOOTSTRAP_SERVERS", DEFAULT_BROKERS)
 producer = Producer({"bootstrap.servers": KAFKA_BROKER})
+val = Validator()
 
-# Controle global de execução para permitir STOP/PAUSE via comando Kafka
 estado_execucao = {"ativo": False, "pausado": False}
 
 def entrega_callback(err, msg):
@@ -19,20 +20,32 @@ def entrega_callback(err, msg):
         print(f"[!] Falha na entrega para o Kafka: {err}")
 
 def publicar_evento(topic, schema, session_id, sequence, payload, captured_at=None, source_id="cam0"):
-    agora = datetime.now(timezone.utc).isoformat()
-    envelope = {
-        "message_type": "event",
-        "message_id": str(uuid.uuid4()),
-        "schema": schema,
-        "schema_version": "1.0",
-        "producer": "P6",
-        "source_id": source_id,
-        "published_at": agora,
-        "captured_at": captured_at if captured_at else agora,
-        "session_id": session_id,
-        "sequence": sequence,
-        "payload": payload
-    }
+    agora = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    
+    # ods.session.started possui additionalProperties: false estrito na raiz
+    if schema == "ods.session.started":
+        envelope = {
+            "schema": schema,
+            "message_type": "event",
+            "producer": "P6",
+            "payload": payload
+        }
+    else:
+        envelope = {
+            "message_type": "event",
+            "message_id": str(uuid.uuid4()),
+            "schema": schema,
+            "schema_version": "1.0",
+            "producer": "P6",
+            "source_id": source_id,
+            "published_at": agora,
+            "captured_at": captured_at if captured_at else agora,
+            "session_id": session_id,
+            "sequence": sequence,
+            "payload": payload
+        }
+        
+    val.validate(envelope)
     producer.produce(
         topic=topic,
         value=json.dumps(envelope).encode("utf-8"),
@@ -40,14 +53,13 @@ def publicar_evento(topic, schema, session_id, sequence, payload, captured_at=No
     )
     producer.poll(0)
 
-def executar_replay(recording_id="rec-mock-001", speed_factor=1.0, loop=False, headless=True):
+def executar_replay(recording_id="rec-001", speed_factor=1.0, loop=False, headless=True):
     estado_execucao["ativo"] = True
     estado_execucao["pausado"] = False
 
     conn = sqlite3.connect('p6_metadata.db')
     cursor = conn.cursor()
 
-    # Busca o caminho do vídeo na tabela scenarios, se existir
     cursor.execute("SELECT file_path FROM scenarios WHERE recording_id = ?", (recording_id,))
     row_video = cursor.fetchone()
     caminho_video = row_video[0] if row_video and os.path.exists(row_video[0]) else 'gravacao_p6.mp4'
@@ -59,13 +71,12 @@ def executar_replay(recording_id="rec-mock-001", speed_factor=1.0, loop=False, h
     nova_sessao_replay = str(uuid.uuid4())
     sequencia_p6 = 0
 
-    # 1. Publicar marcador canônico ods.session.started
+    # 1. Publicar marcador canônico ods.session.started (sem previous_session_id quando nulo)
     payload_sessao = {
         "mode": "REPLAY",
-        "started_at": datetime.now(timezone.utc).isoformat(),
+        "started_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "sources": ["cam0"],
         "recording_id": recording_id,
-        "previous_session_id": None,
         "reason": "START"
     }
     publicar_evento("ods.session.started", "ods.session.started", nova_sessao_replay, sequencia_p6, payload_sessao)
@@ -74,7 +85,9 @@ def executar_replay(recording_id="rec-mock-001", speed_factor=1.0, loop=False, h
     print(f"[P6] Sessão REPLAY iniciada ({recording_id}): {nova_sessao_replay}")
 
     cap = cv2.VideoCapture(caminho_video)
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    fps = float(cap.get(cv2.CAP_PROP_FPS) or 30.0)
+    largura = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 640)
+    altura = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 480)
     duracao_total_ms = int((total_frames / fps) * 1000)
     frame_atual = 0
     ultimo_envio_estado = time.time()
@@ -94,20 +107,20 @@ def executar_replay(recording_id="rec-mock-001", speed_factor=1.0, loop=False, h
 
         cursor.execute("SELECT media_timestamp FROM frame_timestamps WHERE frame_index = ?", (frame_atual,))
         resultado = cursor.fetchone()
-        timestamp_original = resultado[0] if resultado else datetime.now(timezone.utc).isoformat()
+        timestamp_original = resultado[0] if resultado else datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-        # Publica frame na mesma interface da câmera (ods.p4.frame)
+        # Publica frame na mesma interface da câmera conforme FrameEvent schema
         payload_frame = {
             "frame_index": frame_atual,
-            "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-            "height": int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
-            "encoding": "metadata_ref",
-            "source_mode": "REPLAY"
+            "image_width": max(1, largura),
+            "image_height": max(1, altura),
+            "pixel_format": "BGR24",
+            "fps": fps,
+            "raw": True
         }
         publicar_evento("ods.p4.frame", "ods.p4.frame", nova_sessao_replay, sequencia_p6, payload_frame, captured_at=timestamp_original)
         sequencia_p6 += 1
 
-        # Publicar ods.p6.replay.state a cada 1 segundo
         tempo_atual = time.time()
         if tempo_atual - ultimo_envio_estado >= 1.0:
             posicao_ms = int((frame_atual / fps) * 1000)
@@ -132,7 +145,6 @@ def executar_replay(recording_id="rec-mock-001", speed_factor=1.0, loop=False, h
 
         frame_atual += 1
 
-    # Enviar estado STOPPED ao encerrar
     payload_fim = {
         "recording_id": recording_id,
         "state": "STOPPED",
