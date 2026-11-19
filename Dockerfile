@@ -14,4 +14,6 @@ COPY . .
 
 ENV KAFKA_BOOTSTRAP_SERVERS="34.66.235.91:9093"
 
+RUN python3 scripts/setup_db.py
+
 CMD ["python3", "-u", "scripts/p6_listener.py"]
