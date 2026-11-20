@@ -1,10 +1,24 @@
-# P6 - Fonte de Replay (ODS TRA-1)
+# P6 - Fonte de Replay (ODS TRA-2)
 
-Módulo responsável por gerenciar a reprodução de mídias gravadas e coordenar as quebras de sessão via Apache Kafka de acordo com os contratos da arquitetura ODS 6c.
+Módulo responsável por armazenar cenários de teste, gravar fluxos de mídia e coordenar a reprodução de gravações e quebras de sessão via Apache Kafka, seguindo os contratos da arquitetura ODS 6c.
 
-## Pré-requisitos
+## Arquitetura e Conexão (Nuvem)
+
+O serviço encontra-se implantado em contêiner Docker na Google Cloud Platform (GCP), conectado continuamente ao broker Kafka central da disciplina:
+
+- **Broker Kafka:** `34.66.235.91:9093`
+- **Tópicos de Entrada (Consumidos pelo P6):**
+  - `ods.p6.recordings.query` — Consulta a lista de cenários disponíveis no banco SQLite (`p6_metadata.db`).
+  - `ods.p6.replay.command` — Inicia a reprodução de um cenário gravado (`recording_id`) para consumo dos módulos de visão/detecção.
+  - `ods.p6.record.command` — Inicia ou encerra a gravação de um novo cenário de fluxo.
+- **Tópicos de Saída (Publicados pelo P6):**
+  - `ods.p6.recordings.response` — Retorna os metadados dos cenários disponíveis.
+  - Eventos de controle de sessão e frames conforme o contrato ODS 6c.
+
+## Pré-requisitos (Execução Local)
+
 - Python 3.12+
-- OpenCV / yt-dlp / confluent-kafka
+- Dependências listadas em `requirements.txt` (`opencv-python`, `yt-dlp`, `confluent-kafka`, `pydantic`, `pytest`)
 
 ```bash
 python3 -m venv .venv
@@ -12,24 +26,38 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Execução
+## Execução Local e Testes
 
 1. **Executar Testes Unitários:**
-   ```bash
-   pytest test_p6.py
-   ```
+```bash
+pytest test_p6.py
+```
 
-2. **Gerar Mídia de Mock (opcional):**
-   ```bash
-   python p6_mock_captura.py
-   ```
+2. **Inicializar o Banco de Cenários (opcional — já incluso no repositório):**
+```bash
+python3 scripts/setup_db.py
+```
 
-3. **Iniciar o Motor de Replay:**
-   ```bash
-   python p6_replay.py
-   ```
+3. **Gerar Mídia de Mock (opcional — já incluso em `gravacao_p6.mp4`):**
+```bash
+python3 scripts/p6_mock_captura.py
+```
 
-4. **Monitorar Eventos no Kafka:**
-   ```bash
-   python verificar_kafka_p6.py
-   ```
+4. **Iniciar o Listener Principal do P6:**
+```bash
+python3 -u scripts/p6_listener.py
+```
+
+5. **Monitorar Eventos no Broker Kafka:**
+```bash
+python3 verificar_kafka_p6.py
+```
+
+## Deploy com Docker
+
+A imagem já embute o banco SQLite (`p6_metadata.db`) e a mídia padrão (`gravacao_p6.mp4`) para execução autônoma:
+
+```bash
+docker build -t ods-p6 .
+docker run -d --restart unless-stopped --name p6-service ods-p6
+```
