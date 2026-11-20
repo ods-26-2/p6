@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 
 # 1. Preparar o Banco de Dados (SQLite)
-conn = sqlite3.connect('../p6_metadata.db')
+conn = sqlite3.connect('p6_metadata.db')
 cursor = conn.cursor()
 
 cursor.execute('''
@@ -18,21 +18,24 @@ cursor.execute('''
 ''')
 conn.commit()
 
-# 2. Configurar o yt-dlp para extrair o stream
-url_youtube = "https://www.youtube.com/watch?v=7aMOurgDB-o"
-ydl_opts = {
-    'format': 'bestvideo/best/b',
-    'quiet': True
-}
+# 2. Definir a fonte de vídeo (vídeo padrão de monitoramento de pedestres ou link do YouTube)
+url_fonte = "https://raw.githubusercontent.com/opencv/opencv/master/samples/data/vtest.avi"
 
 print("Resolvendo URL do stream...")
-with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-    info = ydl.extract_info(url_youtube, download=False)
-    stream_url = info['url']
+if url_fonte.endswith((".mp4", ".avi")):
+    stream_url = url_fonte
+else:
+    ydl_opts = {
+        'format': 'best[vcodec^=avc1][height<=720]/best[ext=mp4][vcodec!*=av01]',
+        'quiet': True
+    }
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        info = ydl.extract_info(url_fonte, download=False)
+        stream_url = info['url']
 
 cap = cv2.VideoCapture(stream_url)
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-out = cv2.VideoWriter('../gravacao_p6.mp4', fourcc, 30.0, (640, 480))
+out = cv2.VideoWriter('gravacao_p6.mp4', fourcc, 30.0, (640, 480))
 
 # 3. Variáveis de estado da sessão
 session_id = str(uuid.uuid4())
