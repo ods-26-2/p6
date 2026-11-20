@@ -11,13 +11,13 @@ __pycache__/
 
 # Mídias e artefatos binários gerados localmente
 *.mp4
-gravacao_p6.mp4
+!gravacao_p6.mp4
 
 # Bancos de dados de teste / runtime
 *.db
 *.sqlite
 *.sqlite3
-p6_metadata.db
+!p6_metadata.db
 
 # Configurações de IDE / OS
 .vscode/
