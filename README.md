@@ -6,7 +6,7 @@ Módulo responsável por armazenar cenários de teste, gravar fluxos de mídia e
 
 O serviço encontra-se implantado em contêiner Docker na Google Cloud Platform (GCP), conectado continuamente ao broker Kafka central da disciplina:
 
-- **Broker Kafka:** `34.66.235.91:9093`
+- **Broker Kafka (Público):** `200.17.66.56:9093` (rede interna/Jetson: `172.18.4.56:9092`)
 - **Tópicos de Entrada (Consumidos pelo P6):**
   - `ods.p6.recordings.query` — Consulta a lista de cenários disponíveis no banco SQLite (`p6_metadata.db`).
   - `ods.p6.replay.command` — Inicia a reprodução de um cenário gravado (`recording_id`) para consumo dos módulos de visão/detecção.
