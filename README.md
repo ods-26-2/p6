@@ -12,7 +12,7 @@ O serviço encontra-se implantado em contêiner Docker na Google Cloud Platform 
   - `ods.p6.replay.command` — Inicia a reprodução de um cenário gravado (`recording_id`) para consumo dos módulos de visão/detecção.
   - `ods.p6.record.command` — Inicia ou encerra a gravação de um novo cenário de fluxo.
 - **Tópicos de Saída (Publicados pelo P6):**
-  - `ods.p6.recordings.response` — Retorna os metadados dos cenários disponíveis.
+  - `ods.p6.recordings.reply` — Retorna os metadados dos cenários disponíveis.
   - Eventos de controle de sessão e frames conforme o contrato ODS 6c.
 
 ## Pré-requisitos (Execução Local)
