@@ -12,6 +12,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-ENV KAFKA_BOOTSTRAP_SERVERS="200.17.66.56:9093"
+ENV KAFKA_BOOTSTRAP_SERVERS="34.66.235.91:9093"
 
 CMD ["python3", "-u", "scripts/p6_listener.py"]
